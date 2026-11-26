@@ -87,7 +87,7 @@ function lineChart(series, w = 560, h = 190) {
 }
 
 /* ---- Views ---- */
-const NAV = [['dash', 'nav_dash'], ['work', 'nav_work'], ['mat', 'nav_mat'], ['req', 'nav_req'], ['market', 'nav_market'], ['subst', 'nav_subst'], ['inv', 'nav_inv'], ['sup', 'nav_sup'], ['batch', 'nav_batch'], ['ai', 'nav_ai'], ['add', 'nav_add'], ['scn', 'nav_scn'], ['hist', 'nav_hist'], ['src', 'nav_src']];
+const NAV = [['dash', 'nav_dash'], ['work', 'nav_work'], ['mat', 'nav_mat'], ['req', 'nav_req'], ['market', 'nav_market'], ['subst', 'nav_subst'], ['inv', 'nav_inv'], ['sup', 'nav_sup'], ['batch', 'nav_batch'], ['ai', 'nav_ai'], ['add', 'nav_add'], ['roles', 'nav_roles'], ['scn', 'nav_scn'], ['hist', 'nav_hist'], ['src', 'nav_src']];
 function shell(body) {
   const nav = NAV.map(([k, lab]) => `<a class="nv ${S.route === k ? 'on' : ''}" data-act="route" data-v="${k}">${esc(t(lab))}</a>`).join('');
   const later = I[getLang()].later_items.map(x => `<div class="nv dis">${esc(x)} <small>${esc(t('soon'))}</small></div>`).join('');
@@ -95,7 +95,7 @@ function shell(body) {
   const user = window.FFI_USER ? `<span class="usr">${esc(window.FFI_USER.email)} · ${esc(role)}</span>` : `<span class="usr muted">${esc(t('login_none'))}</span>`;
   return `<header class="top"><div class="brand"><div class="logo">F</div><div><b>${esc(t('app'))}</b><small>${esc(t('sub'))}</small></div></div>
   <div class="tools">${user}<div id="gsi"></div><button class="btn ghost" data-act="lang">${esc(t('lang'))}</button></div></header>
-  <div class="layout"><nav class="side">${nav}<div class="sp">${esc(t('nav_later'))}</div>${later}</nav><main class="main">${body}</main></div>`;
+  <div class="layout"><nav class="side">${nav}${later ? '<div class="sp">' + esc(t('nav_later')) + '</div>' + later : ''}</nav><main class="main">${body}</main></div>`;
 }
 
 function viewWork() {
@@ -339,6 +339,13 @@ function viewAdd() {
   ${rows ? `<table class="tb sm"><thead><tr><th>${esc(t('add_name'))}</th><th>${esc(t('add_dose'))}</th><th>${esc(t('add_cost'))}</th><th>${esc(t('add_cpm'))}</th><th></th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td><b>${esc(t('total'))}</b></td><td class="n"><b>${fx(dose, 3)}</b></td><td></td><td class="n"><b>${fx(cost)}</b></td><td></td></tr></tfoot></table>
   <p class="note">${esc(t('add_pct'))}: ${fx(dose / 10, 3)}% &nbsp; ${Math.abs(dose - expect) > 0.001 ? '<span class="pill bad">' + esc(t('add_mismatch')) + ' ' + fx(expect, 2) + ' kg/MT</span>' : ''}</p><div class="bar"><button class="btn" data-act="apm">${esc(t('add_use'))}</button></div>` : ''}<p class="note warnt">${esc(t('add_warn'))}</p></section>`;
 }
+
+function viewRoles() {
+  const u = window.FFI_USER; const adm = u && u.email === ADMIN;
+  const P = [['perm_view', 1, 1], ['perm_calc', 1, 1], ['perm_save', 1, 0], ['perm_cloud', 1, 0], ['perm_approve', 1, 0], ['perm_export', 1, 1]];
+  const rows = P.map(([k, a1, v1]) => `<tr><td>${esc(t(k))}</td><td>${a1 ? '✓' : '-'}</td><td>${v1 ? '✓' : '-'}</td></tr>`).join('');
+  return `<section class="card"><h3>${esc(t('roles_title'))}</h3><p>${u ? esc(u.email) + ' · <b>' + esc(adm ? t('role_admin') : t('role_viewer')) + '</b>' : esc(t('login_none')) + ' · ' + esc(t('roles_local'))}</p><table class="tb sm"><thead><tr><th></th><th>${esc(t('role_admin'))}</th><th>${esc(t('role_viewer'))}</th></tr></thead><tbody>${rows}</tbody></table><p class="note">${esc(t('roles_note'))}</p></section>`;
+}
 function viewSrc() {
   const ar = getLang() === 'ar';
   const items = ar ? [
@@ -500,7 +507,7 @@ function render() {
   const lang = getLang(); document.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
   document.title = t('app');
   let body;
-  try { body = ({ dash: viewDash, work: viewWork, mat: viewMat, req: viewReq, scn: viewScn, hist: viewHist, src: viewSrc, market: viewMarket, subst: viewSubst, inv: viewInv, sup: viewSup, batch: viewBatch, ai: viewAI, add: viewAdd }[S.route] || viewWork)(); } catch (err) { body = '<pre>' + esc(err.stack) + '</pre>'; console.error(err); }
+  try { body = ({ dash: viewDash, work: viewWork, mat: viewMat, req: viewReq, scn: viewScn, hist: viewHist, src: viewSrc, market: viewMarket, subst: viewSubst, inv: viewInv, sup: viewSup, batch: viewBatch, ai: viewAI, add: viewAdd, roles: viewRoles }[S.route] || viewWork)(); } catch (err) { body = '<pre>' + esc(err.stack) + '</pre>'; console.error(err); }
   const y = window.scrollY; const active = document.activeElement; 
   $('#app').innerHTML = shell(body);
   window.scrollTo(0, y);

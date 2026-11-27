@@ -27,15 +27,35 @@
       if (!r.ok) { sync = 'err'; return; }
       const rows = await r.json(); sync = 'ok';
       if (rows[0] && rows[0].data) { const S = window.FFI_STATE(); KEYS.forEach(k => { if (rows[0].data[k] !== undefined) S[k] = rows[0].data[k]; }); S.opt = null; window.FFI_PERSIST && window.FFI_PERSIST(true); }
+      setTimeout(() => window.FFI_LEDGER_FLUSH(), 500);
     } catch (e) { sync = 'err'; }
   }
   let tm = null;
   window.FFI_PUSH = function () {
     if (!window.FFI_USER || !sess || sync === 'err') return; clearTimeout(tm);
     tm = setTimeout(async () => {
+      window.FFI_LEDGER_FLUSH && window.FFI_LEDGER_FLUSH();
       const S = window.FFI_STATE(), data = {}; KEYS.forEach(k => data[k] = S[k]);
       try { const r = await fetch(cfg.SUPABASE_URL + '/rest/v1/feed_state?on_conflict=user_id', { method: 'POST', headers: Object.assign(H(sess.access_token), { Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify({ user_id: window.FFI_USER.id, data, updated_at: new Date().toISOString() }) }); sync = r.ok ? 'ok' : 'err'; } catch (e) { sync = 'err'; }
     }, 1200);
+  };
+  let flushing = false;
+  window.FFI_LEDGER_FLUSH = async function () {
+    if (flushing || !window.FFI_USER || !sess || window.FFI_USER.email !== cfg.ADMIN_EMAIL) return; flushing = true;
+    try {
+      const S = window.FFI_STATE(); let changed = false;
+      for (const b of (S.batches || [])) {
+        b.led = b.led || {};
+        for (const ev of ['final', 'void']) {
+          const has = ev === 'final' ? (b.status === 'final' || (b.status === 'void' && b.finalAt)) : b.status === 'void';
+          if (!has || b.led[ev]) continue;
+          const payload = ev === 'final' ? { batch_id: b.id, finalized_at: b.finalAt, finalized_by: b.by, stage: b.stageId, qty_mt: b.qty, planned_kg: b.planned, actual_kg: b.actual, price_usd_mt: b.price, produced_kg: b.produced, lab: b.lab, checksum: b.chk } : { batch_id: b.id, voided_at: b.voidAt, voided_by: b.voidBy, reason: b.voidReason };
+          const r = await fetch(cfg.SUPABASE_URL + '/rest/v1/feed_batch_events', { method: 'POST', headers: Object.assign(H(sess.access_token), { Prefer: 'return=minimal' }), body: JSON.stringify({ user_id: window.FFI_USER.id, batch_id: b.id, event: ev, payload }) });
+          if (r.ok || r.status === 409) { b.led[ev] = true; changed = true; } else { b.ledErr = r.status; }
+        }
+      }
+      if (changed) { window.FFI_PERSIST && window.FFI_PERSIST(); window.FFI_RENDER && window.FFI_RENDER(); }
+    } catch (e) { } finally { flushing = false; }
   };
   window.FFI_AUTH = {
     mount(el) {
